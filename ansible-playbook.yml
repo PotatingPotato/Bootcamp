@@ -1,0 +1,34 @@
+---
+- hosts: all # comes from the hosts file
+  become: true # become sudo
+  gather_facts: false # save time and not gather info
+
+  tasks:
+    - name: set sudo password
+      set_fact:
+        ansible_sudo_pass: "{{ ansible_ssh_pass }}"
+
+    - name: copy war from Jenkins to target host
+      copy:
+        src: /var/lib/jenkins/workspace/Phechorda-Deploy-on-Container-using-Ansible/webapp/target/webapp.war
+        dest: /opt/docker/phechorda
+
+    - name: stop current container
+      command: docker stop phechorda-devops-container
+      ignore_errors: yes # in case container doesn't exist
+
+    - name: remove stopped container
+      command: docker rm phechorda-devops-container
+      ignore_errors: yes # in case container doesn't exist
+
+    - name: remove docker images 
+      command: docker rmi phechorda-devops-image:latest
+      ignore_errors: yes # in case image does not exist
+
+    - name: create docker image using war file
+      command: docker build -t phechorda-devops-image:latest .
+      args:
+        chdir: /opt/docker/phechorda
+
+    - name: run container from docker image
+      command: docker run -d --name phechorda-devops-container -p 8081:8080 phechorda-devops-image:latest
